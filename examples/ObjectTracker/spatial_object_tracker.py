@@ -7,6 +7,7 @@ import numpy as np
 import time
 import argparse
 
+
 labelMap = ["background", "aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow",
             "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor"]
 
@@ -60,7 +61,7 @@ spatialDetectionNetwork.setBoundingBoxScaleFactor(0.5)
 spatialDetectionNetwork.setDepthLowerThreshold(100)
 spatialDetectionNetwork.setDepthUpperThreshold(5000)
 
-objectTracker.setDetectionLabelsToTrack([15])  # track only person
+objectTracker.setDetectionLabelsToTrack([5])  # track only person
 # possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
 objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)
 # take the smallest ID when new object is tracked, possible options: SMALLEST_ID, UNIQUE_ID
@@ -97,6 +98,8 @@ with dai.Device(pipeline) as device:
     counter = 0
     fps = 0
     color = (255, 255, 255)
+    output = 0
+    okras = []
 
     while(True):
         imgFrame = preview.get()
@@ -108,7 +111,9 @@ with dai.Device(pipeline) as device:
             fps = counter / (current_time - startTime)
             counter = 0
             startTime = current_time
+            output += 1
 
+        coor = []
         frame = imgFrame.getCvFrame()
         trackletsData = track.tracklets
         for t in trackletsData:
@@ -131,6 +136,56 @@ with dai.Device(pipeline) as device:
             cv2.putText(frame, f"X: {int(t.spatialCoordinates.x)} mm", (x1 + 10, y1 + 65), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
             cv2.putText(frame, f"Y: {int(t.spatialCoordinates.y)} mm", (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
             cv2.putText(frame, f"Z: {int(t.spatialCoordinates.z)} mm", (x1 + 10, y1 + 95), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+            coor.append(f"{t.id} {int(t.spatialCoordinates.x)},{int(t.spatialCoordinates.y)},{int(t.spatialCoordinates.z)}")
+        
+        if(output >=3) and ((okras)):
+            okraNums = []
+            okraCount = []
+            for x in okras :
+                if not(int(x[0]) in okraNums):
+                    okraNums.append(int(x[0]))
+            
+            print(okraNums)
+            maxOkra = max(okraNums)
+            okraNums = []
+            for x in range(maxOkra + 1):
+                okraCount.append(0)
+                okraNums.append([0,0,0])
+            
+            print(okraNums)
+            for x in okras:
+                okraCount[int(x[0])] += 1
+                temp = x[2:].split(",")
+                print(int(x[0]))
+                okraNums[int(x[0])][0] += (int(temp[0]))
+                okraNums[int(x[0])][1] += (int(temp[1]))
+                okraNums[int(x[0])][2] += (int(temp[2]))
+            
+            i = 0
+            print('okraCount:',okraCount)
+
+            file = open('./allFolders.txt', 'w')
+            for x in okraCount:
+                print(i)
+                if(x > 5):
+                    print(okraNums[i])
+                    file.write(f"{okraNums[i][0]/x},{okraNums[i][1]/x},{okraNums[i][2]/x}\n")
+                    print(okraNums[i][0]/x)
+                    print(okraNums[i][1]/x)
+                    print(okraNums[i][2]/x)
+                    print("---")
+                i +=1
+
+            file.close()
+            print('done')
+            output = 0
+            okras = []
+        else:
+            for x in coor:
+                okras.append(x)
+
+        
+        # file.write(coor)
 
         cv2.putText(frame, "NN fps: {:.2f}".format(fps), (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color)
 
